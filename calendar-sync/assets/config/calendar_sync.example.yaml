@@ -1,0 +1,99 @@
+# ============================================================
+# 通用日历同步工具 - 配置文件示例
+# ============================================================
+# 复制此文件为 calendar_sync.yaml 并修改配置
+# 支持 ${ENV_VAR} 语法引用环境变量
+# ============================================================
+
+# ============================================================
+# 日历源配置
+# 可选类型: caldav, google, outlook, ical
+# ============================================================
+source:
+  # --- CalDAV (企业微信/iCloud/Nextcloud 等) ---
+  type: caldav
+  preset: wecom                              # 预设: wecom, icloud, nextcloud, synology
+  url: https://caldav.wecom.work/calendar/   # CalDAV 服务器地址
+  username: ${WECOM_CALDAV_USERNAME}         # 用户名
+  password: ${WECOM_CALDAV_PASSWORD}         # 密码
+
+  # --- Google Calendar ---
+  # type: google
+  # credentials_file: credentials.json       # OAuth2 凭据文件
+  # token_file: token.json                   # 令牌缓存文件
+
+  # --- Outlook / Microsoft 365 ---
+  # type: outlook
+  # client_id: your-app-client-id            # Azure AD 应用 ID
+  # tenant_id: common                        # 租户 ID
+
+  # --- iCal 文件/URL ---
+  # type: ical
+  # paths:                                   # 本地 .ics 文件
+  #   - /path/to/calendar.ics
+  # urls:                                    # 订阅 URL
+  #   - https://example.com/feed.ics
+
+# ============================================================
+# AI 分类器配置
+# 可选类型: keyword, zhipu, openai, claude, ollama
+# ============================================================
+ai:
+  # --- 智谱 AI ---
+  type: zhipu
+  api_key: ${ZHIPU_API_KEY}
+  model: glm-4-flash
+  temperature: 0.3
+
+  # --- OpenAI / 兼容接口 (DeepSeek, 通义千问等) ---
+  # type: openai
+  # api_key: ${OPENAI_API_KEY}
+  # model: gpt-4o-mini
+  # base_url: https://api.openai.com/v1     # DeepSeek: https://api.deepseek.com/v1
+
+  # --- Claude ---
+  # type: claude
+  # api_key: ${ANTHROPIC_API_KEY}
+  # model: claude-sonnet-4-20250514
+
+  # --- Ollama (本地) ---
+  # type: ollama
+  # base_url: http://localhost:11434
+  # model: qwen2.5:7b
+
+  # --- 关键词规则 (无需 AI) ---
+  # type: keyword
+
+# ============================================================
+# 笔记输出配置
+# 可选类型: notion, obsidian, logseq, markdown
+# ============================================================
+output:
+  # --- Notion ---
+  type: notion
+  token: ${NOTION_TOKEN}
+  database_id: ${NOTION_DATABASE_ID}
+  domain_field: "领域"                        # 领域字段名
+  category_field: "分类"                      # 分类字段名
+  tags_field: "标签"                          # 标签字段名
+  date_field: "Date"                          # 日期字段名
+  default_domain: "🏢工作"                    # 默认领域值
+
+  # --- Obsidian ---
+  # type: obsidian
+  # vault_path: /path/to/obsidian/vault      # Vault 路径
+  # folder: Calendar                          # 子目录名
+  # frontmatter: true                         # 是否添加 YAML frontmatter
+  # date_format: "%Y-%m-%d"
+
+  # --- Logseq ---
+  # type: logseq
+  # graph_path: /path/to/logseq/graph        # 图谱路径
+  # folder: pages                             # 页面目录
+  # journal: false                            # true = 写入日记页, false = 创建独立页面
+
+  # --- Markdown 文件 ---
+  # type: markdown
+  # output_dir: ./calendar_notes              # 输出目录
+  # organize_by: date                         # 组织方式: date, category, flat
+  # frontmatter: true

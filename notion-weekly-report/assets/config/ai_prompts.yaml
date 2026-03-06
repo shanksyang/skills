@@ -1,0 +1,83 @@
+# AI总结引擎提示词配置
+# 版本: 1.0
+# 说明: 定义不同总结级别和分类的提示词
+
+version: "1.0"
+
+# 总结级别配置
+summary_levels:
+  short:
+    name: "简短总结"
+    max_length: 50
+    temperature: 0.5
+    max_tokens: 100
+    system_prompt: |
+      你是一个专业的笔记总结助手。请将笔记内容总结为不超过50字的简短摘要。
+      要求：简洁精炼，突出核心要点。
+    user_prompt_template: |
+      请将以下笔记内容总结为不超过50字的简短摘要。
+      标题：{title}
+      内容：{content}
+      要求：
+      1. 简洁精炼，突出核心要点
+      2. 不超过50字
+
+  standard:
+    name: "标准总结"
+    max_length: 100
+    temperature: 0.7
+    max_tokens: 200
+    system_prompt: |
+      你是一个专业的笔记总结助手。请将笔记内容总结为不超过100字的摘要。
+      要求：保留关键信息，条理清晰。
+    user_prompt_template: |
+      请将以下笔记内容总结为不超过100字的摘要。
+      标题：{title}
+      内容：{content}
+      要求：
+      1. 保留关键信息（人物、议题、结论）
+      2. 条理清晰，语言简洁
+      3. 不超过100字
+
+  detailed:
+    name: "详细总结"
+    max_length: 200
+    temperature: 0.7
+    max_tokens: 400
+    system_prompt: |
+      你是一个专业的笔记总结助手。请将笔记内容总结为详细的摘要（不超过200字）。
+      要求：包含背景、过程、要点和结论。
+    user_prompt_template: |
+      请将以下笔记内容总结为详细的摘要（不超过200字）。
+      标题：{title}
+      内容：{content}
+
+# 分类专用提示词
+category_specific_prompts:
+  work_business:
+    name: "客户对接"
+    prefix: "【客户对接】"
+    focus: "客户名称、拜访目的、讨论内容、后续计划、关键承诺"
+
+  work_management:
+    name: "业务活动"
+    prefix: "【业务活动】"
+    focus: "会议议题、决策内容、行动计划、责任人"
+
+  life:
+    name: "生活记录"
+    prefix: "【生活记录】"
+    focus: "活动内容、参与者、感受体会"
+
+# 全局配置
+global:
+  default_level: standard
+  default_temperature: 0.7
+  default_max_tokens: 200
+  retry:
+    max_attempts: 3
+    backoff_factor: 2.0
+    initial_delay: 1.0
+  fallback:
+    enabled: true
+    strategy: "truncate"

@@ -1,0 +1,76 @@
+# 增强分类系统规则配置
+# 版本: 2.0
+# 说明: 通过YAML动态配置分类规则，支持置信度评分和优先级
+
+version: "2.0"
+
+# 分类规则列表
+rules:
+  # ===== 客户对接分类 =====
+  - id: "rule_001"
+    category: "work_business"
+    display_name: "客户对接"
+    priority: 1
+    description: "与客户相关的业务活动，包括拜访、会议、签约等"
+    required_tags:
+      - "工作"
+      - "业务"
+    optional_tags:
+      - "拜访"
+      - "签约"
+      - "会议"
+      - "沟通"
+      - "提案"
+      - "谈判"
+    confidence_boost: 0.1
+    min_confidence: 0.5
+
+  # ===== 业务活动分类 =====
+  - id: "rule_002"
+    category: "work_management"
+    display_name: "业务活动"
+    priority: 2
+    description: "内部业务管理活动，包括例会、计划、总结等"
+    required_tags:
+      - "工作"
+      - "管理"
+    optional_tags:
+      - "例会"
+      - "周会"
+      - "月会"
+      - "计划"
+      - "总结"
+      - "评审"
+      - "培训"
+    confidence_boost: 0.1
+    min_confidence: 0.5
+
+  # ===== 聚餐社交分类 =====
+  - id: "rule_003"
+    category: "social"
+    display_name: "聚餐社交"
+    priority: 3
+    description: "社交、聚餐等活动"
+    required_tags:
+      - "社交"
+    optional_tags:
+      - "聚餐"
+      - "晚宴"
+      - "活动"
+      - "春茗"
+    confidence_boost: 0.05
+    min_confidence: 0.4
+
+# 置信度计算配置
+confidence:
+  required_tag_weight: 0.5
+  optional_tag_weight: 0.1
+  max_confidence: 1.0
+  decimal_places: 2
+
+# 默认分类配置
+default:
+  category: "work_business"
+  display_name: "商务活动"
+  confidence: 0.3
+  reason: "未匹配到任何分类规则，使用默认分类"
