@@ -31,6 +31,11 @@ class SimpleReportGenerator:
         self.database_id = os.getenv("NOTION_DATABASE_ID")
         self.zhipu = zhipuai.ZhipuAI(api_key=os.getenv("ZHIPU_API_KEY"))
         self.author = os.getenv("WEEKLY_REPORT_AUTHOR", "shanks")
+        # 输出目录：项目根目录下的 reports/
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.normpath(os.path.join(script_dir, "..", "..", "..", ".."))
+        self.output_dir = os.path.join(project_root, "reports")
+        os.makedirs(self.output_dir, exist_ok=True)
     
     def get_date_range(self, week_id):
         week_id = week_id.strip().lower()
@@ -66,7 +71,7 @@ class SimpleReportGenerator:
         return start_date, end_date
     
     def fetch_notes(self, start_date, end_date):
-        print("正在从Notion获取笔记...")
+        print("正在从Notion获取笔记（筛选标签=周报）...")
         all_pages = []
         has_more = True
         next_cursor = None
@@ -75,10 +80,16 @@ class SimpleReportGenerator:
             query_params = {
                 "database_id": self.database_id,
                 "filter": {
-                    "property": "领域",
-                    "select": {
-                        "equals": "🏢工作"
-                    }
+                    "and": [
+                        {
+                            "property": "领域",
+                            "select": {"equals": "🏢工作"}
+                        },
+                        {
+                            "property": "标签",
+                            "multi_select": {"contains": "周报"}
+                        }
+                    ]
                 }
             }
             if next_cursor:
@@ -137,7 +148,19 @@ class SimpleReportGenerator:
                 except Exception as e:
                     print(f"  获取内容失败 ({title}): {e}")
 
-                filtered_notes.append({"title": title, "date": note_date, "content": content})
+                # 读取 Notion 中的分类属性
+                notion_categories = []
+                cat_prop = props.get("分类", {})
+                if cat_prop and cat_prop.get("type") == "multi_select":
+                    for opt in cat_prop.get("multi_select", []):
+                        notion_categories.append(opt.get("name", ""))
+
+                filtered_notes.append({
+                    "title": title,
+                    "date": note_date,
+                    "content": content,
+                    "notion_categories": notion_categories,
+                })
 
         print(f"✓ 获取到 {len(filtered_notes)} 篇笔记")
         return filtered_notes
@@ -154,9 +177,12 @@ class SimpleReportGenerator:
         for note in notes:
             title = note["title"]
             content = note["content"]
+            notion_cats = note.get("notion_categories", [])
             
-            # AI 分类 + 总结一次完成
-            category = self._classify_note(title, content)
+            # 优先使用 Notion 分类属性映射（结合标题判断差旅）
+            category = self._map_notion_category(notion_cats, title)
+            if not category:
+                category = self._classify_note(title, content)
             summary = self._summarize_note(title, content)
             
             if category not in categories:
@@ -169,6 +195,37 @@ class SimpleReportGenerator:
             })
         
         return categories
+    
+    def _map_notion_category(self, notion_cats, title=""):
+        """根据 Notion 分类属性 + 标题映射到周报分类"""
+        if not notion_cats:
+            return None
+        
+        # 差旅关键词优先判断（标题中含差旅关键词的 商务活动 归为差旅）
+        travel_keywords = ["飞机", "航班", "酒店", "高铁", "火车", "打车", "机场", "车票", "住宿"]
+        for kw in travel_keywords:
+            if kw in title:
+                return "差旅行程"
+        
+        cat_mapping = {
+            "客户拜访": "客户拜访",
+            "商务活动": "客户拜访",
+            "方案汇报": "客户拜访",
+            "内部会议": "内部会议",
+            "会议": "内部会议",
+            "项目评审": "内部会议",
+            "培训学习": "内部会议",
+            "团队管理": "内部会议",
+            "管理": "内部会议",
+            "聚餐社交": "其他事项",
+            "聚餐": "其他事项",
+            "活动": "其他事项",
+        }
+        
+        for nc in notion_cats:
+            if nc in cat_mapping:
+                return cat_mapping[nc]
+        return None
     
     def _classify_note(self, title, content):
         """AI 智能分类"""
@@ -308,10 +365,11 @@ class SimpleReportGenerator:
             else:
                 filename = f"周报_{week_id}_{start_date.strftime('%Y%m%d')}.md"
             
-            with open(filename, 'w', encoding='utf-8') as f:
+            filepath = os.path.join(self.output_dir, filename)
+            with open(filepath, 'w', encoding='utf-8') as f:
                 f.write(report)
             
-            print(f"\n✓ 周报已生成: {filename}")
+            print(f"\n✓ 周报已生成: {filepath}")
             print(f"  文件大小: {len(report)} 字符")
             
             print("\n" + "=" * 60)
