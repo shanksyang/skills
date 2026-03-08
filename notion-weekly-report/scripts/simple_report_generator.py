@@ -18,7 +18,7 @@
 """
 import sys
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from notion_client import Client
 from dotenv import load_dotenv
 import zhipuai
@@ -119,6 +119,9 @@ class SimpleReportGenerator:
                                     print(f"  日期解析失败: {date_str}, {e}")
                                     pass
 
+            # 统一为 naive datetime 进行比较
+            if note_date and note_date.tzinfo is not None:
+                note_date = note_date.replace(tzinfo=None)
             if note_date and start_date <= note_date <= end_date:
                 content = ""
                 try:
@@ -139,22 +142,99 @@ class SimpleReportGenerator:
         print(f"✓ 获取到 {len(filtered_notes)} 篇笔记")
         return filtered_notes
     
-    def summarize_with_zhipu(self, content, title):
+    def classify_and_summarize(self, notes):
+        """使用 AI 批量分类并总结笔记"""
+        categories = {
+            "客户拜访": [],
+            "内部会议": [],
+            "差旅行程": [],
+            "其他事项": [],
+        }
+        
+        for note in notes:
+            title = note["title"]
+            content = note["content"]
+            
+            # AI 分类 + 总结一次完成
+            category = self._classify_note(title, content)
+            summary = self._summarize_note(title, content)
+            
+            if category not in categories:
+                category = "其他事项"
+            
+            categories[category].append({
+                "title": title,
+                "date": note["date"],
+                "summary": summary,
+            })
+        
+        return categories
+    
+    def _classify_note(self, title, content):
+        """AI 智能分类"""
+        keywords_map = {
+            "差旅行程": ["飞机", "航班", "酒店", "高铁", "火车", "打车", "机场", "车票"],
+            "客户拜访": ["拜访", "客户", "briefing", "汇报", "对接"],
+            "内部会议": ["例会", "周会", "评审", "分享", "周例会", "项目会", "kickoff"],
+        }
+        
+        for category, keywords in keywords_map.items():
+            for kw in keywords:
+                if kw in title:
+                    return category
+        
+        # 关键词未命中时用 AI 分类
         try:
-            prompt = f"请将以下笔记内容总结为不超过100字的摘要：\n\n标题：{title}\n内容：{content}\n\n要求：简洁明了，突出要点。"
+            prompt = (
+                f"请将以下工作事项分类为以下类别之一，只回复类别名称：\n"
+                f"- 客户拜访（拜访客户、客户沟通、商务洽谈）\n"
+                f"- 内部会议（公司内部会议、评审、分享）\n"
+                f"- 差旅行程（机票、酒店、交通）\n"
+                f"- 其他事项\n\n"
+                f"标题：{title}\n内容摘要：{content[:200]}"
+            )
+            response = self.zhipu.chat.completions.create(
+                model="glm-4-flash",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.1,
+                max_tokens=20,
+            )
+            result = response.choices[0].message.content.strip()
+            for cat in ["客户拜访", "内部会议", "差旅行程", "其他事项"]:
+                if cat in result:
+                    return cat
+        except Exception as e:
+            print(f"  ⚠ AI分类失败: {e}")
+        
+        return "其他事项"
+    
+    def _summarize_note(self, title, content):
+        """AI 总结笔记"""
+        try:
+            text = content if content.strip() else title
+            prompt = (
+                f"请将以下工作笔记总结为一句话摘要（不超过80字）。\n\n"
+                f"标题：{title}\n内容：{text}\n\n"
+                f"要求：\n"
+                f"1. 只保留业务相关的关键信息（人物、事项、结论、决策）\n"
+                f"2. 必须忽略以下无关信息：日历同步、caldav、wecom、API、自动同步、企业微信日历、会议链接、电话号码、拨号方式\n"
+                f"3. 如果内容主要是行程信息（航班/酒店/交通），只保留出发地、目的地、时间\n"
+                f"4. 如果内容为空或只有标题，根据标题推测事项并简要描述\n"
+                f"5. 语言简洁专业，像写给领导看的周报"
+            )
             
             response = self.zhipu.chat.completions.create(
                 model="glm-4-flash",
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.7,
-                max_tokens=200
+                temperature=0.5,
+                max_tokens=150,
             )
             
-            summary = response.choices[0].message.content
-            return summary.strip()
+            summary = response.choices[0].message.content.strip()
+            return summary
         except Exception as e:
             print(f"  ⚠ AI总结失败: {e}")
-            return content[:100]
+            return content[:100] if content.strip() else title
     
     def generate_report(self, start_date, end_date):
         print("\n正在使用智谱AI生成周报...")
@@ -166,21 +246,7 @@ class SimpleReportGenerator:
         
         notes.sort(key=lambda x: x["date"])
         
-        categorized = {"客户对接": [], "业务活动": [], "生活记录": []}
-        
-        for note in notes:
-            title = note["title"]
-            content = note["content"]
-            
-            if "生活" in title or "聚餐" in title:
-                category = "生活记录"
-            elif "管理" in title or "例会" in title or "周会" in title:
-                category = "业务活动"
-            else:
-                category = "客户对接"
-            
-            summary = self.summarize_with_zhipu(content, title)
-            categorized[category].append({"title": title, "date": note["date"], "summary": summary})
+        categorized = self.classify_and_summarize(notes)
         
         return self._generate_markdown(categorized, start_date, end_date)
     
@@ -189,30 +255,31 @@ class SimpleReportGenerator:
         
         lines.append(f"**{self.author}周报**\n")
         
-        start_str = start_date.strftime("%m%d")
-        end_str = end_date.strftime("%m%d")
+        start_str = start_date.strftime("%m.%d")
+        end_str = end_date.strftime("%m.%d")
         year = start_date.year
-        if end_date.year != start_date.year:
-            end_str = f"{end_date.year}.{end_str}"
         
-        lines.append(f"**{year}年{start_date.strftime('%m')}月第{start_date.isocalendar()[1]}周**（{start_str}{end_str}）\n")
-        lines.append("**1、本周总结**\n")
-        lines.append(f"本周共{sum(len(v) for v in categorized.values())}项工作活动。\n")
+        lines.append(f"**{year}年第{start_date.isocalendar()[1]}周**（{start_str}-{end_str}）\n")
         
-        category_map = {
-            "客户对接": "**1.1、客户对接**\n",
-            "业务活动": "**1.2、业务活动**\n",
-            "生活记录": "**2、生活记录**\n"
-        }
+        total = sum(len(v) for v in categorized.values())
+        lines.append("**一、本周总结**\n")
+        lines.append(f"本周共{total}项工作活动。\n")
         
-        for category, items in categorized.items():
-            if items:
-                lines.append(category_map.get(category, category))
-                for item in items:
-                    date_str = item["date"].strftime("%m%d")
-                    weekday = ["一", "二", "三", "四", "五", "六", "日"][item["date"].weekday()]
-                    lines.append(f"● {weekday}（{date_str}）：{item['title']}\n")
-                    lines.append(f"{item['summary']}\n")
+        # 按固定顺序输出分类，跳过空分类
+        section_idx = 1
+        section_order = ["客户拜访", "内部会议", "差旅行程", "其他事项"]
+        
+        for category in section_order:
+            items = categorized.get(category, [])
+            if not items:
+                continue
+            lines.append(f"**{section_idx}.{category}**（{len(items)}项）\n")
+            section_idx += 1
+            for item in items:
+                date_str = item["date"].strftime("%m/%d")
+                weekday = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"][item["date"].weekday()]
+                lines.append(f"● {weekday}（{date_str}）{item['title']}")
+                lines.append(f"  {item['summary']}\n")
         
         return "\n".join(lines)
     
