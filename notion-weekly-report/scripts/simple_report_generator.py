@@ -165,6 +165,88 @@ class SimpleReportGenerator:
         print(f"✓ 获取到 {len(filtered_notes)} 篇笔记")
         return filtered_notes
     
+    def fetch_next_week_plans(self, current_end_date):
+        """获取下周（当前周结束后的下一周）带周报标签的工作笔记作为下周计划"""
+        next_monday = current_end_date + timedelta(days=1)
+        # 确保 next_monday 是周一
+        while next_monday.weekday() != 0:
+            next_monday += timedelta(days=1)
+        next_sunday = next_monday + timedelta(days=6)
+        
+        print(f"\n正在从Notion获取下周计划（{next_monday.strftime('%m/%d')}-{next_sunday.strftime('%m/%d')}）...")
+        
+        all_pages = []
+        has_more = True
+        next_cursor = None
+        
+        while has_more:
+            query_params = {
+                "database_id": self.database_id,
+                "filter": {
+                    "and": [
+                        {"property": "领域", "select": {"equals": "🏢工作"}},
+                        {"property": "标签", "multi_select": {"contains": "周报"}}
+                    ]
+                }
+            }
+            if next_cursor:
+                query_params["start_cursor"] = next_cursor
+            response = self.notion.databases.query(**query_params)
+            all_pages.extend(response.get("results", []))
+            has_more = response.get("has_more", False)
+            next_cursor = response.get("next_cursor")
+        
+        plans = []
+        for page in all_pages:
+            props = page.get("properties", {})
+            
+            title = "无标题"
+            title_prop = props.get("title", {})
+            if not title_prop or title_prop.get("type") != "title":
+                title_prop = props.get("Name", {})
+            if title_prop and title_prop.get("type") == "title":
+                title_parts = title_prop.get("title", [])
+                if title_parts:
+                    title = title_parts[0].get("text", {}).get("content", "无标题")
+            
+            note_date = None
+            for field_name in ["Date", "时间", "time"]:
+                if field_name in props:
+                    date_prop = props[field_name]
+                    if date_prop and isinstance(date_prop, dict):
+                        date_data = date_prop.get("date")
+                        if date_data and isinstance(date_data, dict):
+                            date_str = date_data.get("start", "")
+                            if date_str:
+                                try:
+                                    if date_str.endswith("Z"):
+                                        date_str = date_str.replace("Z", "+00:00")
+                                    note_date = datetime.fromisoformat(date_str)
+                                    break
+                                except Exception:
+                                    pass
+            
+            if note_date and note_date.tzinfo is not None:
+                note_date = note_date.replace(tzinfo=None)
+            
+            if note_date and next_monday <= note_date <= next_sunday:
+                # 读取 Notion 分类
+                notion_categories = []
+                cat_prop = props.get("分类", {})
+                if cat_prop and cat_prop.get("type") == "multi_select":
+                    for opt in cat_prop.get("multi_select", []):
+                        notion_categories.append(opt.get("name", ""))
+                
+                plans.append({
+                    "title": title,
+                    "date": note_date,
+                    "notion_categories": notion_categories,
+                })
+        
+        plans.sort(key=lambda x: x["date"])
+        print(f"✓ 获取到 {len(plans)} 项下周计划")
+        return plans, next_monday, next_sunday
+    
     def classify_and_summarize(self, notes):
         """使用 AI 批量分类并总结笔记"""
         categories = {
@@ -305,9 +387,12 @@ class SimpleReportGenerator:
         
         categorized = self.classify_and_summarize(notes)
         
-        return self._generate_markdown(categorized, start_date, end_date)
+        # 获取下周计划
+        next_week_plans, nw_start, nw_end = self.fetch_next_week_plans(end_date)
+        
+        return self._generate_markdown(categorized, start_date, end_date, next_week_plans, nw_start, nw_end)
     
-    def _generate_markdown(self, categorized, start_date, end_date):
+    def _generate_markdown(self, categorized, start_date, end_date, next_week_plans=None, nw_start=None, nw_end=None):
         lines = []
         
         lines.append(f"**{self.author}周报**\n")
@@ -318,11 +403,11 @@ class SimpleReportGenerator:
         
         lines.append(f"**{year}年第{start_date.isocalendar()[1]}周**（{start_str}-{end_str}）\n")
         
+        # === 一、本周总结 ===
         total = sum(len(v) for v in categorized.values())
         lines.append("**一、本周总结**\n")
         lines.append(f"本周共{total}项工作活动。\n")
         
-        # 按固定顺序输出分类，跳过空分类
         section_idx = 1
         section_order = ["客户拜访", "内部会议", "差旅行程", "其他事项"]
         
@@ -337,6 +422,26 @@ class SimpleReportGenerator:
                 weekday = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"][item["date"].weekday()]
                 lines.append(f"● {weekday}（{date_str}）{item['title']}")
                 lines.append(f"  {item['summary']}\n")
+        
+        # === 二、下周计划 ===
+        lines.append("\n**二、下周计划**\n")
+        
+        if next_week_plans and nw_start and nw_end:
+            nw_start_str = nw_start.strftime("%m.%d")
+            nw_end_str = nw_end.strftime("%m.%d")
+            lines.append(f"下周（{nw_start_str}-{nw_end_str}）共{len(next_week_plans)}项计划：\n")
+            
+            for plan in next_week_plans:
+                date_str = plan["date"].strftime("%m/%d")
+                weekday = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"][plan["date"].weekday()]
+                # 用 Notion 分类辅助标注类型
+                category = self._map_notion_category(plan.get("notion_categories", []), plan["title"])
+                if not category:
+                    category = self._classify_note(plan["title"], "")
+                cat_label = f"【{category}】" if category != "其他事项" else ""
+                lines.append(f"● {weekday}（{date_str}）{cat_label}{plan['title']}")
+        else:
+            lines.append("暂无下周计划安排。\n")
         
         return "\n".join(lines)
     
