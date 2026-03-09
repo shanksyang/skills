@@ -1,0 +1,61 @@
+# 粤语翻译与语音合成配置文件
+# 复制为 cantonese_tts.yaml 后修改
+
+# ============================================================
+# 翻译器配置
+# ============================================================
+translator:
+  # 可选: zhipu | openai | qwen
+  type: zhipu
+
+  # --- 智谱 AI (推荐，glm-4-flash 免费额度充足) ---
+  api_key: ${ZHIPU_API_KEY}
+  model: glm-4-flash
+
+  # --- OpenAI (含兼容接口如 DeepSeek) ---
+  # type: openai
+  # api_key: ${OPENAI_API_KEY}
+  # model: gpt-4o-mini
+  # base_url: ""  # 留空使用官方接口，DeepSeek: https://api.deepseek.com/v1
+
+  # --- 通义千问 ---
+  # type: qwen
+  # api_key: ${DASHSCOPE_API_KEY}
+  # model: qwen-turbo
+  # base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+
+# ============================================================
+# TTS 引擎配置
+# ============================================================
+tts:
+  # 可选: edge | tencent | gtts
+  type: edge
+
+  # --- Edge-TTS (推荐，免费无需 API Key) ---
+  voice: zh-HK-HiuGaaiNeural   # 粤语女声(活泼)
+  # voice: zh-HK-HiuMaanNeural  # 粤语女声(温柔)
+  # voice: zh-HK-WanLungNeural   # 粤语男声
+  rate: "+0%"      # 语速调节: -50% ~ +100%
+  volume: "+0%"    # 音量调节: -50% ~ +100%
+  pitch: "+0Hz"    # 音调调节
+
+  # --- 腾讯云 TTS ---
+  # type: tencent
+  # secret_id: ${TENCENT_SECRET_ID}
+  # secret_key: ${TENCENT_SECRET_KEY}
+  # voice_type: 101019  # 智彤（粤语女声）
+  # region: ap-guangzhou
+  # sample_rate: 16000
+  # codec: mp3
+
+  # --- gTTS (Google, 免费但需访问 Google) ---
+  # type: gtts
+  # lang: zh-TW  # 或 yue
+  # slow: false
+
+# ============================================================
+# 输出配置
+# ============================================================
+output:
+  dir: ./output     # 输出目录
+  format: mp3       # 音频格式: mp3 | wav

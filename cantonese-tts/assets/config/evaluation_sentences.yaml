@@ -1,0 +1,84 @@
+# 翻译和 TTS 评测标准测试语句集
+# 包含不同场景的普通话→粤语对照
+
+sentences:
+  # 日常问候
+  - mandarin: "你好，今天天气怎么样？"
+    reference: "你好，今日天氣點呀？"
+    category: 日常问候
+
+  - mandarin: "你吃过饭了吗？"
+    reference: "你食咗飯未呀？"
+    category: 日常问候
+
+  # 日常对话
+  - mandarin: "我不知道他去了哪里。"
+    reference: "我唔知佢去咗邊度。"
+    category: 日常对话
+
+  - mandarin: "他说的话我听不懂。"
+    reference: "佢講嘅嘢我聽唔明。"
+    category: 日常对话
+
+  - mandarin: "你在哪里？我找你很久了。"
+    reference: "你喺邊度呀？我搵咗你好耐喇。"
+    category: 日常对话
+
+  # 购物
+  - mandarin: "这个东西多少钱？"
+    reference: "呢樣嘢幾多錢呀？"
+    category: 购物
+
+  - mandarin: "太贵了，能便宜一点吗？"
+    reference: "太貴喇，平啲得唔得呀？"
+    category: 购物
+
+  # 邀约
+  - mandarin: "我们明天一起去吃饭吧。"
+    reference: "我哋聽日一齊去食飯啦。"
+    category: 邀约
+
+  - mandarin: "下班以后我们去喝茶。"
+    reference: "收工之後我哋去飲茶。"
+    category: 邀约
+
+  # 表达感受
+  - mandarin: "这件事情很难办。"
+    reference: "呢件事好難搞。"
+    category: 表达感受
+
+  - mandarin: "别着急，慢慢来。"
+    reference: "唔使急，慢慢嚟。"
+    category: 安慰
+
+  - mandarin: "我在这里等你很久了。"
+    reference: "我喺呢度等咗你好耐喇。"
+    category: 表达状态
+
+  # 工作场景
+  - mandarin: "这个项目的进度怎么样了？"
+    reference: "呢個項目嘅進度點呀？"
+    category: 工作
+
+  - mandarin: "老板说明天要开会讨论。"
+    reference: "老細話聽日要開會傾下。"
+    category: 工作
+
+  # 出行
+  - mandarin: "请问地铁站怎么走？"
+    reference: "唔該請問地鐵站點行呀？"
+    category: 出行
+
+  # 复杂句式
+  - mandarin: "如果你有空的话，我们一起去看电影好不好？"
+    reference: "如果你得閒嘅話，我哋一齊去睇戲好唔好呀？"
+    category: 复杂句式
+
+  - mandarin: "我觉得这样做不太好，你觉得呢？"
+    reference: "我覺得噉做唔太好，你覺得呢？"
+    category: 复杂句式
+
+  # 长句
+  - mandarin: "昨天我和朋友去了一家新开的餐厅，那里的菜很好吃，下次我们一起去。"
+    reference: "琴日我同朋友去咗一間新開嘅餐廳，嗰度啲嘢食好好食，下次我哋一齊去。"
+    category: 长句
