@@ -405,23 +405,57 @@ class SimpleReportGenerator:
         
         # === 一、本周总结 ===
         total = sum(len(v) for v in categorized.values())
-        lines.append("**一、本周总结**\n")
-        lines.append(f"本周共{total}项工作活动。\n")
         
-        section_idx = 1
+        # 统计各分类数量
         section_order = ["客户拜访", "内部会议", "差旅行程", "其他事项"]
+        category_counts = {}
+        for cat in section_order:
+            category_counts[cat] = len(categorized.get(cat, []))
         
+        # 汇总段落
+        summary_parts = []
+        for cat in section_order:
+            count = category_counts.get(cat, 0)
+            if count > 0:
+                summary_parts.append(f"{cat}{count}项")
+        summary_text = "、".join(summary_parts) if summary_parts else "无"
+        
+        lines.append("**一、本周总结**\n")
+        lines.append(f"本周共 **{total}** 项工作活动，包括 {summary_text}。\n")
+        
+        # 按分类展开，标题+内容解析格式
+        section_idx = 1
         for category in section_order:
             items = categorized.get(category, [])
             if not items:
                 continue
-            lines.append(f"**{section_idx}.{category}**（{len(items)}项）\n")
+            
+            lines.append(f"\n**{section_idx}.{category}**（{len(items)}项）\n")
             section_idx += 1
+            
+            # 每个条目独立展示：时间，标题，客户 + AI总结
             for item in items:
                 date_str = item["date"].strftime("%m/%d")
-                weekday = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"][item["date"].weekday()]
-                lines.append(f"● {weekday}（{date_str}）{item['title']}")
-                lines.append(f"  {item['summary']}\n")
+                time_str = item["date"].strftime("%H:%M") if item["date"].hour != 0 or item["date"].minute != 0 else ""
+                title = item.get("title", "")
+                customer = item.get("customer", "")
+                
+                # 构建头部信息（地点已在title中，无需重复）
+                header_parts = [f"{date_str} {time_str}" if time_str else date_str, title]
+                if customer:
+                    header_parts.append(customer)
+                
+                header = "，".join(filter(None, header_parts))
+                lines.append(f"- {header}")
+                
+                # AI 总结内容（差旅行程不需要）
+                if category != "差旅行程":
+                    summary = item.get("summary", "")
+                    if summary:
+                        # 换行缩进显示总结
+                        for line in summary.split('\n'):
+                            lines.append(f"  {line}")
+                lines.append("")
         
         # === 二、下周计划 ===
         lines.append("\n**二、下周计划**\n")
@@ -429,17 +463,53 @@ class SimpleReportGenerator:
         if next_week_plans and nw_start and nw_end:
             nw_start_str = nw_start.strftime("%m.%d")
             nw_end_str = nw_end.strftime("%m.%d")
-            lines.append(f"下周（{nw_start_str}-{nw_end_str}）共{len(next_week_plans)}项计划：\n")
             
+            # 按分类汇总下周计划
+            plan_categories = {}
             for plan in next_week_plans:
-                date_str = plan["date"].strftime("%m/%d")
-                weekday = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"][plan["date"].weekday()]
-                # 用 Notion 分类辅助标注类型
                 category = self._map_notion_category(plan.get("notion_categories", []), plan["title"])
                 if not category:
                     category = self._classify_note(plan["title"], "")
-                cat_label = f"【{category}】" if category != "其他事项" else ""
-                lines.append(f"● {weekday}（{date_str}）{cat_label}{plan['title']}")
+                if category not in plan_categories:
+                    plan_categories[category] = []
+                
+                location = plan.get("location", "")
+                customer = plan.get("customer", "")
+                display_title = self._build_display_title(plan["title"], location, customer)
+                
+                plan_categories[category].append({
+                    "title": display_title,
+                    "date": plan["date"],
+                    "location": location,
+                    "customer": customer,
+                })
+            
+            lines.append(f"下周（{nw_start_str}-{nw_end_str}）共 **{len(next_week_plans)}** 项计划：\n")
+            
+            # 每个条目独立展示
+            weekday_names = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+            
+            for cat in section_order:
+                cat_plans = plan_categories.get(cat, [])
+                if not cat_plans:
+                    continue
+                lines.append(f"\n**{cat}**（{len(cat_plans)}项）")
+                
+                for plan in cat_plans:
+                    date_str = plan["date"].strftime("%m/%d")
+                    weekday = weekday_names[plan["date"].weekday()]
+                    title = plan["title"]
+                    customer = plan["customer"]
+                    
+                    # 构建头部信息（地点已在title中）
+                    header_parts = [f"{weekday} {date_str}", title]
+                    if customer:
+                        header_parts.append(customer)
+                    
+                    header = "，".join(filter(None, header_parts))
+                    lines.append(f"- {header}")
+                
+                lines.append("")
         else:
             lines.append("暂无下周计划安排。\n")
         

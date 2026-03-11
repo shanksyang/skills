@@ -63,8 +63,8 @@
 ### calendar-sync v2.0.0
 通用日历同步工具，插件化架构。
 
-### notion-weekly-report v1.0.0
-Notion 笔记生成 AI 周报。
+### notion-weekly-report v1.1.0
+Notion 笔记生成 AI 周报，支持总分结构+标题内容解析格式。
 
 ### file-upload v1.0.0
 Notion 文件上传与管理工具。

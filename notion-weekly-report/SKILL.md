@@ -1,5 +1,6 @@
 ---
 name: notion-weekly-report
+version: 1.1.0
 description: "Notion 笔记生成 AI 周报工具。This skill should be used when users need to generate weekly reports from Notion notes using AI summarization, query Notion database for work notes, or automate weekly report generation. Covers Notion data querying, AI-powered note summarization, and formatted Markdown report output."
 ---
 
