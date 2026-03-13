@@ -3,7 +3,11 @@
 import os
 import sys
 from dotenv import load_dotenv
-load_dotenv('/Users/huiyang/Documents/2026/005agents/skills/.env')
+
+# 动态获取项目根目录
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+_PROJECT_ROOT = os.path.dirname(_SCRIPT_DIR)
+load_dotenv(os.path.join(_PROJECT_ROOT, '.env'))
 
 sys.stdout.reconfigure(line_buffering=True)
 
