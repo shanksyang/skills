@@ -165,16 +165,62 @@ output: { type: markdown, output_dir: ./notes, organize_by: date }
 | 问题 | 解决方案 |
 |------|----------|
 | CalDAV 403 Forbidden | URL 末尾必须有 `/calendar/`，密码可能已过期 |
-| Notion API 报错 | 确保使用 `notion-client==2.2.1`，检查 Token 权限 |
+| Notion API 报错 | 确保使用 httpx 直接调用 API，检查 Token 权限 |
 | AI 分类降级 | 正常现象，关键词规则仍可提供不错的准确率 |
 | 重复条目 | 基于 `sync_state.json` 的 UID 去重，删除该文件可重新同步 |
 | Google 授权失败 | 检查 `credentials.json`，删除 `token.json` 重新授权 |
 | 插件未找到 | 运行 `--list-plugins` 确认可用插件，检查配置中的 type 值 |
+| 时间不准 | 确保使用 UTC+8 北京时区转换（详见简化脚本） |
+| 查询超时 | 企微 CalDAV search 较慢，建议分批查询或缩小范围 |
 
 ## 关键技术细节
 
-- **Notion API**：必须使用 `notion-client==2.2.1`（v3 有不兼容变更）
+- **Notion API**：使用 `httpx` 直接调用 API（解决 notion_client 兼容性问题）
+- **时区处理**：企微日历返回 UTC 时间，需转换为北京时间 (UTC+8)
+- **参与人员**：从 iCal ATTENDEE 字段提取，最多同步 10 人到 Notion "人员" 字段（注：企微 CalDAV 目前不返回参与人员数据）
 - **CalDAV 企微端点**：`https://caldav.wecom.work/calendar/`，末尾 `/calendar/` 不可省略
 - **配置优先级**：`--config` 参数 > `calendar_sync.yaml` > `config/calendar_sync.yaml` > `.env` 降级
 - **AI 降级机制**：所有 AI 分类器在失败时自动降级为关键词规则分类
 - **OpenAI 兼容接口**：通过 `base_url` 支持 DeepSeek、通义千问等兼容 API
+
+## 简化脚本
+
+项目提供了两个简化版同步脚本：
+
+### sync_batch.py (推荐)
+
+分批按天查询优化版，解决企微 CalDAV 查询慢/超时问题：
+
+```bash
+cd calendar-sync
+python sync_batch.py
+```
+
+**特性：**
+- 按天分批查询，避免超时
+- 每天单独显示进度
+- 关键词分类（无需 AI）
+- 北京时区转换（UTC+8）
+- 自动提取参与人员（最多 10 人）
+- 基于 UID 去重（sync_state.json）
+- 使用 httpx 直接调用 Notion API
+
+### sync_simple.py
+
+原版同步脚本，查询范围更广（14天）：
+
+```bash
+python sync_simple.py
+```
+
+**Notion 数据库必需字段：**
+- `title` (标题)
+- `领域` (Select)
+- `分类` (Multi-select)
+- `标签` (Multi-select)
+- `Date` (Date)
+- `UID` (Rich text)
+- `创建时间` (Date) - 记录创建时间，自动填充
+- `更新时间` (Date) - 记录更新时间，自动填充
+- `地点` (Select, 可选)
+- `人员` (Rich text, 可选) - 存储参与者信息

@@ -107,11 +107,14 @@ class NotionWriter(NoteWriter):
         if "周报" not in tag_names:
             tag_names.append("周报")
 
+        now_iso = datetime.now(tz=timezone(timedelta(hours=8))).isoformat()
         properties = {
             "title": {"title": [{"text": {"content": event.summary}}]},
             self.domain_field: {"select": {"name": self.default_domain}},
             self.tags_field: {"multi_select": [{"name": t} for t in tag_names]},
             self.category_field: {"multi_select": [{"name": classification.category}]},
+            self.created_time_field: {"date": {"start": now_iso}},
+            self.updated_time_field: {"date": {"start": now_iso}},
         }
         if date_prop:
             properties[self.date_field] = {"date": date_prop}

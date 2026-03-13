@@ -77,6 +77,8 @@ output:
   category_field: "分类"                      # 分类字段名
   tags_field: "标签"                          # 标签字段名
   date_field: "Date"                          # 日期字段名
+  created_time_field: "创建时间"              # 创建时间字段名
+  updated_time_field: "更新时间"              # 更新时间字段名
   default_domain: "🏢工作"                    # 默认领域值
 
   # --- Obsidian ---

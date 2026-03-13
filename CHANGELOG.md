@@ -21,6 +21,15 @@
 
 ---
 
+## [2.1.0] - 2026-03-13
+
+### calendar-sync v2.1.0
+- **新增属性**: Notion 数据库新增 `创建时间` 和 `更新时间` 属性（date 类型）
+  - 创建页面时自动填充当前北京时间（UTC+8）
+  - 所有同步脚本统一支持：sync_batch.py / sync_simple.py / quick_sync.py / notion_writer.py（插件版）
+  - 字段名可通过配置文件自定义（`created_time_field` / `updated_time_field`）
+- **更新文档**: 同步更新 Notion Schema 文档、SKILL.md、配置模板
+
 ## [1.0.0] - 2026-03-10
 
 ### 新增 Skills

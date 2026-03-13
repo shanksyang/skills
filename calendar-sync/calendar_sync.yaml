@@ -1,0 +1,24 @@
+# 日历同步配置
+source:
+  type: caldav
+  preset: wecom
+  url: ${WECOM_CALDAV_URL}
+  username: ${WECOM_CALDAV_USERNAME}
+  password: ${WECOM_CALDAV_PASSWORD}
+
+ai:
+  type: zhipu
+  api_key: ${ZHIPU_API_KEY}
+  model: glm-4-flash
+
+output:
+  type: notion
+  token: ${NOTION_TOKEN}
+  database_id: ${NOTION_DATABASE_ID}
+  domain_field: "领域"
+  category_field: "分类"
+  tags_field: "标签"
+  date_field: "Date"
+  created_time_field: "创建时间"
+  updated_time_field: "更新时间"
+  default_domain: "🏢工作"
