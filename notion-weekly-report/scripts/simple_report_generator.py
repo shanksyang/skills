@@ -25,6 +25,14 @@ import zhipuai
 
 load_dotenv()
 
+# 北京时间时区 (UTC+8)
+BEIJING_TZ = timezone(timedelta(hours=8))
+
+
+def _beijing_now() -> datetime:
+    """获取当前北京时间"""
+    return datetime.now(BEIJING_TZ)
+
 class SimpleReportGenerator:
     def __init__(self):
         self.notion = Client(auth=os.getenv("NOTION_TOKEN"))
@@ -41,17 +49,17 @@ class SimpleReportGenerator:
         week_id = week_id.strip().lower()
         
         if week_id == "this":
-            today = datetime.now()
+            today = _beijing_now()
             days_since_monday = today.weekday()
-            start_date = today - timedelta(days=days_since_monday)
-            end_date = start_date + timedelta(days=6)
+            start_date = (today - timedelta(days=days_since_monday)).replace(hour=0, minute=0, second=0, microsecond=0)
+            end_date = (start_date + timedelta(days=6)).replace(hour=23, minute=59, second=59, microsecond=0)
         elif week_id.startswith("last "):
             weeks = int(week_id.split()[1])
-            today = datetime.now()
+            today = _beijing_now()
             days_since_monday = today.weekday()
-            this_monday = today - timedelta(days=days_since_monday)
+            this_monday = (today - timedelta(days=days_since_monday)).replace(hour=0, minute=0, second=0, microsecond=0)
             start_date = this_monday - timedelta(weeks=weeks)
-            end_date = this_monday + timedelta(days=6)
+            end_date = (this_monday - timedelta(days=1)).replace(hour=23, minute=59, second=59, microsecond=0)  # 上周日
         elif week_id.isdigit() and len(week_id) == 8:
             year = int(week_id[:4])
             month = int(week_id[4:6])
@@ -130,10 +138,15 @@ class SimpleReportGenerator:
                                     print(f"  日期解析失败: {date_str}, {e}")
                                     pass
 
-            # 统一为 naive datetime 进行比较
+            # 统一转为北京时间进行比较
             if note_date and note_date.tzinfo is not None:
-                note_date = note_date.replace(tzinfo=None)
-            if note_date and start_date <= note_date <= end_date:
+                note_date = note_date.astimezone(BEIJING_TZ)
+            elif note_date and note_date.tzinfo is None:
+                note_date = note_date.replace(tzinfo=BEIJING_TZ)
+            # 确保 start_date/end_date 也有时区信息
+            _start = start_date.replace(tzinfo=BEIJING_TZ) if start_date.tzinfo is None else start_date
+            _end = end_date.replace(tzinfo=BEIJING_TZ) if end_date.tzinfo is None else end_date
+            if note_date and _start <= note_date <= _end:
                 content = ""
                 try:
                     blocks = self.notion.blocks.children.list(block_id=page["id"])
@@ -155,11 +168,25 @@ class SimpleReportGenerator:
                     for opt in cat_prop.get("multi_select", []):
                         notion_categories.append(opt.get("name", ""))
 
+                # 读取地点属性
+                location = ""
+                loc_prop = props.get("地点")
+                if loc_prop and isinstance(loc_prop, dict) and loc_prop.get("type") == "select" and loc_prop.get("select"):
+                    location = loc_prop.get("select", {}).get("name", "")
+
+                # 读取客户属性
+                customer = ""
+                cust_prop = props.get("客户")
+                if cust_prop and isinstance(cust_prop, dict) and cust_prop.get("type") == "select" and cust_prop.get("select"):
+                    customer = cust_prop.get("select", {}).get("name", "")
+
                 filtered_notes.append({
                     "title": title,
                     "date": note_date,
                     "content": content,
                     "notion_categories": notion_categories,
+                    "location": location,
+                    "customer": customer,
                 })
 
         print(f"✓ 获取到 {len(filtered_notes)} 篇笔记")
@@ -167,11 +194,11 @@ class SimpleReportGenerator:
     
     def fetch_next_week_plans(self, current_end_date):
         """获取下周（当前周结束后的下一周）带周报标签的工作笔记作为下周计划"""
-        next_monday = current_end_date + timedelta(days=1)
+        next_monday = (current_end_date + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
         # 确保 next_monday 是周一
         while next_monday.weekday() != 0:
             next_monday += timedelta(days=1)
-        next_sunday = next_monday + timedelta(days=6)
+        next_sunday = (next_monday + timedelta(days=6)).replace(hour=23, minute=59, second=59, microsecond=0)
         
         print(f"\n正在从Notion获取下周计划（{next_monday.strftime('%m/%d')}-{next_sunday.strftime('%m/%d')}）...")
         
@@ -227,9 +254,13 @@ class SimpleReportGenerator:
                                     pass
             
             if note_date and note_date.tzinfo is not None:
-                note_date = note_date.replace(tzinfo=None)
+                note_date = note_date.astimezone(BEIJING_TZ)
+            elif note_date and note_date.tzinfo is None:
+                note_date = note_date.replace(tzinfo=BEIJING_TZ)
             
-            if note_date and next_monday <= note_date <= next_sunday:
+            _nw_start = next_monday.replace(tzinfo=BEIJING_TZ) if next_monday.tzinfo is None else next_monday
+            _nw_end = next_sunday.replace(tzinfo=BEIJING_TZ) if next_sunday.tzinfo is None else next_sunday
+            if note_date and _nw_start <= note_date <= _nw_end:
                 # 读取 Notion 分类
                 notion_categories = []
                 cat_prop = props.get("分类", {})
@@ -237,10 +268,24 @@ class SimpleReportGenerator:
                     for opt in cat_prop.get("multi_select", []):
                         notion_categories.append(opt.get("name", ""))
                 
+                # 读取地点属性
+                location = ""
+                loc_prop = props.get("地点")
+                if loc_prop and isinstance(loc_prop, dict) and loc_prop.get("type") == "select" and loc_prop.get("select"):
+                    location = loc_prop.get("select", {}).get("name", "")
+
+                # 读取客户属性
+                customer = ""
+                cust_prop = props.get("客户")
+                if cust_prop and isinstance(cust_prop, dict) and cust_prop.get("type") == "select" and cust_prop.get("select"):
+                    customer = cust_prop.get("select", {}).get("name", "")
+
                 plans.append({
                     "title": title,
                     "date": note_date,
                     "notion_categories": notion_categories,
+                    "location": location,
+                    "customer": customer,
                 })
         
         plans.sort(key=lambda x: x["date"])
@@ -260,23 +305,69 @@ class SimpleReportGenerator:
             title = note["title"]
             content = note["content"]
             notion_cats = note.get("notion_categories", [])
+            location = note.get("location", "")
+            customer = note.get("customer", "")
             
             # 优先使用 Notion 分类属性映射（结合标题判断差旅）
             category = self._map_notion_category(notion_cats, title)
             if not category:
                 category = self._classify_note(title, content)
-            summary = self._summarize_note(title, content)
+            summary = self._summarize_note_detailed(title, content)
             
             if category not in categories:
                 category = "其他事项"
             
+            # 构建标题：地点+客户+主题
+            display_title = self._build_display_title(title, location, customer)
+            
             categories[category].append({
-                "title": title,
+                "title": display_title,
                 "date": note["date"],
                 "summary": summary,
+                "location": location,
+                "customer": customer,
             })
         
         return categories
+    
+    def _build_display_title(self, title, location, customer):
+        """构建显示标题：【地点】【客户名】【主题】"""
+        parts = []
+        if location:
+            parts.append(f"【{location}】")
+        if customer:
+            parts.append(f"【{customer}】")
+        parts.append(title)
+        return "".join(parts)
+    
+    def _summarize_note_detailed(self, title, content):
+        """AI 详细总结笔记（多句话）"""
+        try:
+            text = content if content.strip() else title
+            prompt = (
+                f"请将以下工作笔记总结为3-5句话的详细摘要（150-300字）。\n\n"
+                f"标题：{title}\n内容：{text}\n\n"
+                f"要求：\n"
+                f"1. 详细描述工作内容、讨论要点、结论和决策（每条30-50字）\n"
+                f"2. 必须忽略以下无关信息：日历同步、caldav、wecom、API、自动同步、企业微信日历、会议链接、电话号码、拨号方式、时区\n"
+                f"3. 如果内容主要是行程信息（航班/酒店/交通），描述行程安排和目的\n"
+                f"4. 如果内容为空或只有标题，根据标题推测事项并详细描述\n"
+                f"5. 语言简洁专业，像写给领导看的周报风格\n"
+                f"6. 使用中文句号分隔各句话"
+            )
+            
+            response = self.zhipu.chat.completions.create(
+                model="glm-4-flash",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.5,
+                max_tokens=400,
+            )
+            
+            summary = response.choices[0].message.content.strip()
+            return summary
+        except Exception as e:
+            print(f"  ⚠ AI详细总结失败: {e}")
+            return content[:300] if content.strip() else title
     
     def _map_notion_category(self, notion_cats, title=""):
         """根据 Notion 分类属性 + 标题映射到周报分类"""
@@ -514,6 +605,41 @@ class SimpleReportGenerator:
             lines.append("暂无下周计划安排。\n")
         
         return "\n".join(lines)
+    
+    def _generate_category_summary(self, category, items):
+        """使用 AI 生成单个分类的汇总段落"""
+        # 提取所有事项的摘要
+        summaries = []
+        for item in items:
+            date_str = item["date"].strftime("%m/%d")
+            summaries.append(f"【{date_str}】{item['title']}：{item['summary']}")
+        
+        combined = "\n".join(summaries)
+        
+        try:
+            prompt = (
+                f"请将以下{len(items)}项{category}工作汇总成一段话（200-400字）。\n\n"
+                f"要求：\n"
+                f"1. 按时间顺序叙述本周的{category}工作\n"
+                f"2. 合并相似内容，突出重点工作和关键成果\n"
+                f"3. 提及重要的客户、地点、决策和后续行动\n"
+                f"4. 语言简洁专业，像写给领导看的周报\n\n"
+                f"原始内容：\n{combined}"
+            )
+            
+            response = self.zhipu.chat.completions.create(
+                model="glm-4-flash",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.5,
+                max_tokens=500,
+            )
+            
+            summary = response.choices[0].message.content.strip()
+            return summary
+        except Exception as e:
+            print(f"  ⚠ AI分类汇总失败: {e}")
+            # 降级处理：直接列出
+            return combined
     
     def run(self, week_id):
         try:

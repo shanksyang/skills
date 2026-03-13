@@ -19,3 +19,9 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo
+
+# 运行时状态文件
+sync_state.json
+
+# CodeBuddy
+.codebuddy/
