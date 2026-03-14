@@ -21,6 +21,35 @@
 
 ---
 
+## [3.1.0] - 2026-03-15
+
+### calendar-sync v3.1.0 — AI 智能标签分类 + 脚本精简
+
+#### AI 智能标签分类
+- **集成智谱 GLM AI**: sync_batch.py 新增 AI 标签分类，替代硬编码 `['周报']`
+- **多维度标签生成**: AI 从标题/地点/参与人/描述自动分析生成 3-6 个标签（如：周报, 拜访, 客户, 猿辅导, 北京）
+- **分类 + 标签双输出**: AI 同时输出分类（category）和标签（tags），分类更精准
+- **关键词 fallback**: ZHIPU_API_KEY 未配置或 AI 调用失败时自动降级为增强版关键词分类
+- **历史数据回填**: 生成脚本更新了 84 条已有 Notion 记录的标签（2026-03-08 ~ 2026-04-03）
+
+#### 脚本精简
+- **删除 `sync_simple.py`**: 功能已完全合并到 sync_batch.py
+- **删除 `quick_sync.py`**: 功能已完全合并到 sync_batch.py
+- **统一入口**: sync_batch.py 作为唯一推荐的独立同步脚本
+
+## [3.0.0] - 2026-03-13
+
+### calendar-sync v3.0.0 — 基于 CalDAV 标准协议重构
+- **REPORT calendar-query** (RFC 4791): 一次请求获取整个时间范围的事件，取代旧版按天逐个查询的低效方式（15+ 次 HTTP → 1 次）
+- **sync-token 增量同步** (RFC 6578): 通过 sync-collection REPORT 只拉取上次同步后变更的事件，大幅降低网络开销
+- **CTag 快速检测**: 通过 PROPFIND getctag 判断日历是否有变更，无变更时零查询跳过
+- **expand 循环事件**: 服务端展开 RRULE 循环规则，确保周期性会议不遗漏
+- **ETag 变更检测**: 精确判断单个事件是否被修改
+- **时间格式升级**: 定时事件使用 ISO 8601 完整时间格式（含时区），全天事件保持日期格式
+- **优雅降级策略**: expand 不支持时自动退回基础查询，sync-token 不支持时自动使用 calendar-query
+- **插件版同步更新**: caldav_source.py 同步使用标准协议，增加 expand + split_expanded 支持
+- **所有脚本统一升级**: sync_batch.py 全面重构，删除 sync_simple.py 和 quick_sync.py
+
 ## [2.1.0] - 2026-03-13
 
 ### calendar-sync v2.1.0
@@ -69,8 +98,8 @@
 
 ## 已有 Skills
 
-### calendar-sync v2.0.0
-通用日历同步工具，插件化架构。
+### calendar-sync v3.1.0
+通用日历同步工具，插件化架构，基于 CalDAV 标准协议 (RFC 4791/6578)，AI 智能标签分类。
 
 ### notion-weekly-report v1.1.0
 Notion 笔记生成 AI 周报，支持总分结构+标题内容解析格式。

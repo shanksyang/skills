@@ -12,4 +12,4 @@
     笔记输出: Notion、Obsidian、Logseq
 """
 
-__version__ = "2.0.0"
+__version__ = "3.1.0"

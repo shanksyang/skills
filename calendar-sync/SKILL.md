@@ -171,7 +171,7 @@ output: { type: markdown, output_dir: ./notes, organize_by: date }
 | Google 授权失败 | 检查 `credentials.json`，删除 `token.json` 重新授权 |
 | 插件未找到 | 运行 `--list-plugins` 确认可用插件，检查配置中的 type 值 |
 | 时间不准 | 确保使用 UTC+8 北京时区转换（详见简化脚本） |
-| 查询超时 | 企微 CalDAV search 较慢，建议分批查询或缩小范围 |
+| 查询超时 | 使用 REPORT calendar-query 一次查询完整范围，若仍超时可缩小日期范围 |
 
 ## 关键技术细节
 
@@ -183,41 +183,49 @@ output: { type: markdown, output_dir: ./notes, organize_by: date }
 - **AI 降级机制**：所有 AI 分类器在失败时自动降级为关键词规则分类
 - **OpenAI 兼容接口**：通过 `base_url` 支持 DeepSeek、通义千问等兼容 API
 
-## 简化脚本
+## 独立同步脚本
 
-项目提供了两个简化版同步脚本：
+### `sync_batch.py`（推荐）
 
-### sync_batch.py (推荐)
-
-分批按天查询优化版，解决企微 CalDAV 查询慢/超时问题：
+完整功能同步脚本 v3.1，基于标准 CalDAV 协议 + AI 智能标签分类：
 
 ```bash
 cd calendar-sync
+
+# 常规同步（CTag 检测 → 增量/全量自动选择）
 python sync_batch.py
+
+# 强制全量同步（跳过 CTag 和 sync-token 检查）
+python sync_batch.py --force
 ```
 
 **特性：**
-- 按天分批查询，避免超时
-- 每天单独显示进度
-- 关键词分类（无需 AI）
+- **REPORT calendar-query** (RFC 4791): 一次请求获取整个时间范围
+- **sync-token 增量同步** (RFC 6578): 只拉取变更事件
+- **CTag 快速检测**: 日历无变更时跳过查询
+- **expand 循环事件**: 展开 RRULE，确保周期性会议不遗漏
+- **AI 智能标签分类** (智谱 GLM): 从标题/地点/参与人/描述自动生成 3-6 个多维度标签
+- **AI 降级策略**: ZHIPU_API_KEY 未配置或 AI 调用失败时自动使用增强版关键词分类
+- **`--force` 强制同步**: 跳过 CTag 和 sync-token 检查，直接全量查询
 - 北京时区转换（UTC+8）
-- 自动提取参与人员（最多 10 人）
-- 基于 UID 去重（sync_state.json）
-- 使用 httpx 直接调用 Notion API
+- 自动提取参与人员（最多 15 人）
+- 基于 UID 去重（`sync_state.json`）
+- 使用 httpx 直接调用 Notion API（带重试机制）
 
-### sync_simple.py
+**AI 标签分类示例：**
 
-原版同步脚本，查询范围更广（14天）：
-
-```bash
-python sync_simple.py
-```
+| 标题 | 分类 | 标签 |
+|------|------|------|
+| 【拜访北京】猿辅导 | 客户拜访 | 周报, 拜访, 客户, 猿辅导, 北京 |
+| 【飞机】深圳→武汉 | 其他事项 | 周报, 飞机, 出差, 深圳, 武汉 |
+| 二部ADP项目review | 项目评审 | 周报, ADP项目, 评审, 项目, 会议 |
+| 海洋法治大模型周会 | 内部会议 | 周报, 周会, 会议, 海洋法治, 大模型 |
 
 **Notion 数据库必需字段：**
 - `title` (标题)
 - `领域` (Select)
 - `分类` (Multi-select)
-- `标签` (Multi-select)
+- `标签` (Multi-select) — AI 自动生成多维度标签
 - `Date` (Date)
 - `UID` (Rich text)
 - `创建时间` (Date) - 记录创建时间，自动填充
